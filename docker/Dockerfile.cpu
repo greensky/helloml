@@ -1,0 +1,42 @@
+FROM python:buster
+
+ARG REPO
+ARG TAG=latest
+
+# make sure the image is up to date
+RUN apt-get update
+
+# create a directory for the models
+RUN mkdir -p /opt/ml/models
+RUN chmod +rwx /opt/ml/models
+
+# create a directory for the data
+RUN mkdir -p /opt/ml/data
+RUN chmod +rwx /opt/ml/data
+
+# install system depencencies and conda for virtual environments
+RUN apt-get -qq update && apt-get -qq -y install curl bzip2 \
+    && curl -sSL https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -bfp /usr/local \
+    && rm -rf /tmp/miniconda.sh \
+    && conda install -y python=3 \
+    && conda update conda \
+    && apt-get -qq -y install git \
+    && apt-get -qq -y remove curl bzip2 \
+    && apt-get -qq -y autoremove \
+    && apt-get autoclean \
+    && rm -rf /var/lib/apt/lists/* /var/log/dpkg.log \
+    && conda clean --all --yes
+
+# make sure the conda path is setup properly
+ENV PATH /opt/conda/bin:$PATH
+
+# pull the latest release from the git repository - 
+# note the bustcache comment here. This will ensure this line runs EVERY time this image is built
+# to avoid using a cached version of this layer which might contain stale code
+# use the docker argument $git_repository in order to specify what should be pushed
+#RUN git clone https://github.com/gregorypierce/helloml.git /opt/ml/code # --no-cache: 6598
+RUN git clone --depth 1 --branch $TAG $REPO /opt/ml/code # --no-cache: 6598
+
+# install the requirements using pip
+RUN pip install -r /opt/ml/code/requirements.txt --use-feature=2020-resolver # --no-cache: 6598
